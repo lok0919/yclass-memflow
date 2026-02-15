@@ -72,14 +72,14 @@ impl<const N: usize> Field for IntField<N> {
 
     fn kind(&self) -> FieldKind {
         match N {
-            1 if self.signed => FieldKind::U8,
-            1 if !self.signed => FieldKind::I8,
-            2 if self.signed => FieldKind::U16,
-            2 if !self.signed => FieldKind::I16,
-            4 if self.signed => FieldKind::U32,
-            4 if !self.signed => FieldKind::I32,
-            8 if self.signed => FieldKind::U64,
-            8 if !self.signed => FieldKind::I64,
+            1 if self.signed => FieldKind::I8,
+            1 if !self.signed => FieldKind::U8,
+            2 if self.signed => FieldKind::I16,
+            2 if !self.signed => FieldKind::U16,
+            4 if self.signed => FieldKind::I32,
+            4 if !self.signed => FieldKind::U32,
+            8 if self.signed => FieldKind::I64,
+            8 if !self.signed => FieldKind::U64,
             _ => unreachable!(),
         }
     }
