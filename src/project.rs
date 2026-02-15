@@ -138,7 +138,9 @@ impl ProjectData {
                                     as Box<dyn Field>);
                         }
                     }
-                    other => class.fields.push(other.into_field(Some(name))),
+                    other => class
+                        .fields
+                        .push(other.into_field(field_offset, Some(name))),
                 }
 
                 current_offset = field_offset + kind.size();

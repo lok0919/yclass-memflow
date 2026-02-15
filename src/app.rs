@@ -125,10 +125,12 @@ impl App for YClassApp {
                         .position(|f| f.id() == field_id)
                         .unwrap();
 
+                    // Calculate offset for the field at position `pos`
+                    let offset: usize = class.fields[..pos].iter().map(|f| f.size()).sum();
                     let (old_size, old_name) = (class.fields[pos].size(), class.fields[pos].name());
                     if old_size > new.size() {
                         let mut padding = allocate_padding(old_size - new.size());
-                        class.fields[pos] = new.into_field(old_name);
+                        class.fields[pos] = new.into_field(offset, old_name);
                         while let Some(pad) = padding.pop() {
                             class.fields.insert(pos + 1, pad);
                         }
@@ -155,7 +157,7 @@ impl App for YClassApp {
                         } else {
                             class.fields.drain(pos..pos + steal_len);
                             let mut padding = allocate_padding(steal_size - new.size());
-                            class.fields.insert(pos, new.into_field(old_name));
+                            class.fields.insert(pos, new.into_field(offset, old_name));
 
                             while let Some(pad) = padding.pop() {
                                 class.fields.insert(pos + 1, pad);
