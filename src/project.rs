@@ -140,39 +140,42 @@ impl ProjectData {
                     }
                     FieldKind::Instance => {
                         let classname = metadata.as_deref();
-                        if let Some(refclass) = classname.and_then(|name| list.by_name(name)) {
-                            let refid = refclass.id();
-                            let class = list.by_id_mut(cid).unwrap();
-                            class
-                                .fields
-                                .push(Box::new(InstanceField::new_with_class_id(name, refid))
-                                    as Box<dyn Field>);
-                        } else {
-                            let new_cid = list.add_class(
-                                classname
-                                    .map(str::to_owned)
-                                    .unwrap_or_else(|| format!("C{:X}", field_offset)),
-                            );
-                            let class = list.by_id_mut(cid).unwrap();
-                            class
-                                .fields
-                                .push(Box::new(InstanceField::new_with_class_id(name, new_cid))
-                                    as Box<dyn Field>);
-                        }
+                        let refid =
+                            if let Some(refclass) = classname.and_then(|name| list.by_name(name)) {
+                                refclass.id()
+                            } else {
+                                list.add_class(
+                                    classname
+                                        .map(str::to_owned)
+                                        .unwrap_or_else(|| format!("C{:X}", field_offset)),
+                                )
+                            };
+
+                        let class = list.by_id_mut(cid).unwrap();
+                        class
+                            .fields
+                            .push(Box::new(InstanceField::new_with_class_id(name, refid))
+                                as Box<dyn Field>);
                     }
                     other => class
                         .fields
                         .push(other.into_field(field_offset, Some(name))),
                 }
 
-                current_offset = field_offset + kind.size();
-            }
+                // Calculate the actual field size AFTER adding the field
+                let field_size = match kind {
+                    FieldKind::Instance => {
+                        // For instance fields, get the actual size from the embedded class
+                        let classname = metadata.as_deref();
+                        classname
+                            .and_then(|name| list.by_name(name))
+                            .map(|cl| cl.size())
+                            .unwrap_or(0)
+                    }
+                    other => other.size(),
+                };
 
-            if current_offset % 8 != 0 {
-                list.by_id_mut(cid)
-                    .unwrap()
-                    .fields
-                    .extend(allocate_padding(8 - (current_offset % 8)));
+                current_offset = field_offset + field_size;
             }
         });
 
