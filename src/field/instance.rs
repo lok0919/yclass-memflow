@@ -95,8 +95,11 @@ impl InstanceField {
             ui.set_width(80.);
             ui.vertical_centered_justified(|ui| {
                 for cl in ctx.class_list.classes() {
-                    if ui.button(&cl.name).clicked() {
-                        self.class_id.set(Some(cl.id()));
+                    // Filter out the current class to prevent circular references
+                    if cl.id() != ctx.current_container {
+                        if ui.button(&cl.name).clicked() {
+                            self.class_id.set(Some(cl.id()));
+                        }
                     }
                 }
             });
