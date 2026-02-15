@@ -245,10 +245,20 @@ impl<const N: usize> Field for HexField<N> {
 
         ui.horizontal(|ui| {
             let mut job = LayoutJob::default();
-            display_field_prelude(ui.ctx(), self, ctx, &mut job);
+            let is_misaligned = display_field_prelude(ui.ctx(), self, ctx, &mut job);
             self.byte_view(ctx, &mut job, &buf);
 
-            if ui.add(Label::new(job).sense(Sense::click())).clicked() {
+            let r = ui.add(Label::new(job).sense(Sense::click()));
+            let clicked = r.clicked();
+            if is_misaligned {
+                r.on_hover_text(format!(
+                    "Misaligned: {}-byte field at offset {:04X} (not {}-byte aligned)",
+                    self.size(),
+                    ctx.offset,
+                    self.size()
+                ));
+            }
+            if clicked {
                 ctx.select(self.id);
             }
 

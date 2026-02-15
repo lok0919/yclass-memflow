@@ -11,7 +11,7 @@ pub fn display_field_prelude(
     field: &dyn Field,
     ctx: &mut InspectionContext,
     job: &mut LayoutJob,
-) {
+) -> bool {
     // Display field type abbreviation
     let type_abbr = match field.kind() {
         super::FieldKind::Unk8 => "U8",
@@ -87,6 +87,8 @@ pub fn display_field_prelude(
         8.,
         create_text_format(ctx.is_selected(field.id()), Color32::LIGHT_GREEN),
     );
+
+    is_misaligned
 }
 
 pub fn display_field_value<T: Display>(
