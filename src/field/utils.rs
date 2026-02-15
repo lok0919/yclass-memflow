@@ -54,10 +54,13 @@ pub fn display_field_prelude(
     });
     job.append(" ", 4., TextFormat::default());
 
+    // Check if field is misaligned
+    let is_misaligned = ctx.offset % field.size() != 0;
+
     job.append(&format!("{:04X}", ctx.offset), 0., {
         let mut tf = create_text_format(ctx.is_selected(field.id()), Color32::KHAKI);
-        // Highlight unaligned fields
-        if ctx.offset % 8 != 0 {
+        // Highlight fields not aligned to their natural size
+        if is_misaligned {
             tf.underline = Stroke::new(1., Color32::RED);
         }
 
