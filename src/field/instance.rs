@@ -1,11 +1,14 @@
 use super::{
-    create_text_format, display_field_name, display_field_prelude, display_field_value, next_id,
-    CodegenData, Field, FieldId, FieldKind, FieldResponse, NamedState,
+    create_text_format, display_field_name, display_field_prelude, next_id, CodegenData, Field,
+    FieldId, FieldKind, FieldResponse, NamedState,
 };
 use crate::context::InspectionContext;
 use crate::generator::Generator;
 use eframe::{
-    egui::{collapsing_header::CollapsingState, Id, Label, RichText, Sense, TextFormat, Ui},
+    egui::{
+        collapsing_header::CollapsingState, popup_below_widget, Id, Label, RichText, Sense,
+        TextFormat, Ui,
+    },
     epaint::{text::LayoutJob, Color32},
 };
 use fastrand::Rng;
@@ -15,7 +18,6 @@ pub struct InstanceField {
     id: FieldId,
     state: NamedState,
     class_id: Cell<Option<usize>>,
-    cached_size: Cell<usize>,
 }
 
 impl InstanceField {
@@ -24,7 +26,6 @@ impl InstanceField {
             id: next_id(),
             state: NamedState::new(name),
             class_id: None.into(),
-            cached_size: Cell::new(64),
         }
     }
 
@@ -33,48 +34,24 @@ impl InstanceField {
             id: next_id(),
             state: NamedState::new(name),
             class_id: Some(class_id).into(),
-            cached_size: Cell::new(64),
         }
     }
 
-    /// Update the cached size based on the current class
-    fn update_size(&self, ctx: &InspectionContext) {
-        let size = self
-            .class_id
-            .get()
-            .and_then(|id| ctx.class_list.by_id(id))
-            .map(|cl| cl.size())
-            .unwrap_or(64);
-        self.cached_size.set(size);
-    }
-
     fn show_header(&self, ui: &mut Ui, ctx: &mut InspectionContext) {
-        // Update cached size based on current class
-        self.update_size(ctx);
-
         let class = self.class_id.get().and_then(|id| ctx.class_list.by_id(id));
 
         let (text, exists) = if let Some(cl) = class {
             (format!("[{}]", cl.name), true)
         } else {
-            (format!("[Instance]"), false)
+            (format!("[unassigned]"), false)
         };
 
         let mut job = LayoutJob::default();
-        let is_misaligned = display_field_prelude(ui.ctx(), self, ctx, &mut job);
+        let _is_misaligned = display_field_prelude(ui.ctx(), self, ctx, &mut job);
         job.append(" ", 0., TextFormat::default());
 
         let r = ui.add(Label::new(job).sense(Sense::click()));
-        let clicked = r.clicked();
-        if is_misaligned {
-            r.on_hover_text(format!(
-                "Misaligned: {}-byte field at offset {:04X} (not {}-byte aligned)",
-                self.size(),
-                ctx.offset,
-                self.size()
-            ));
-        }
-        if clicked {
+        if r.clicked() {
             ctx.select(self.id);
         }
 
@@ -84,16 +61,7 @@ impl InstanceField {
 
         ui.add_space(4.);
 
-        display_field_value(
-            self,
-            ui,
-            ctx,
-            &self.state,
-            Color32::YELLOW,
-            |_| format!("{} bytes", self.size()),
-            |_| false,
-        );
-
+        // Display class reference with right-click popup
         let mut job = LayoutJob::default();
         job.append(
             &text,
@@ -103,7 +71,7 @@ impl InstanceField {
                 if exists {
                     Color32::LIGHT_GRAY
                 } else {
-                    Color32::DARK_GRAY
+                    Color32::DARK_RED
                 },
             ),
         );
@@ -115,8 +83,6 @@ impl InstanceField {
             ctx.select(self.id);
         }
 
-        // Show popup for selecting class
-        use eframe::egui::popup_below_widget;
         popup_below_widget(ui, Id::new(ctx.current_id), &r, |ui| {
             ui.set_width(80.);
             ui.vertical_centered_justified(|ui| {
@@ -130,6 +96,15 @@ impl InstanceField {
     }
 
     fn show_body(&self, ui: &mut Ui, ctx: &mut InspectionContext) -> Option<FieldResponse> {
+        // If no class is assigned, show a message
+        if self.class_id.get().is_none() {
+            ui.label(
+                RichText::new("Right-click the class reference above to assign a class")
+                    .color(Color32::LIGHT_GRAY),
+            );
+            return None;
+        }
+
         if !ctx.process.can_read(ctx.address + ctx.offset) {
             ui.heading(
                 RichText::new(format!(
@@ -152,7 +127,6 @@ impl InstanceField {
                 parent_id: ctx.current_id,
                 selection: ctx.selection,
                 current_container: cid,
-                // Will be immediately reassigned.
                 current_id: Id::null(),
                 process: ctx.process,
                 toasts: ctx.toasts,
@@ -183,7 +157,17 @@ impl Field for InstanceField {
     }
 
     fn size(&self) -> usize {
-        self.cached_size.get()
+        // Calculate size from embedded class
+        self.class_id
+            .get()
+            .and_then(|_| {
+                // We can't access context here, so return a placeholder
+                // The actual size is calculated when rendering
+                None
+            })
+            .unwrap_or(0)
+        // If we can't determine size (no class assigned), return 0
+        // This will be overridden during draw() where we have context
     }
 
     fn name(&self) -> Option<String> {
@@ -195,11 +179,15 @@ impl Field for InstanceField {
     }
 
     fn draw(&self, ui: &mut Ui, ctx: &mut InspectionContext) -> Option<FieldResponse> {
-        let mut response = None;
+        // Calculate actual size from the embedded class
+        let actual_size = self
+            .class_id
+            .get()
+            .and_then(|id| ctx.class_list.by_id(id))
+            .map(|cl| cl.size())
+            .unwrap_or(0);
 
-        if self.class_id.get().is_none() {
-            self.class_id.set(Some(fastrand::usize(..)));
-        }
+        let mut response = None;
 
         let state = CollapsingState::load_with_default_open(ui.ctx(), ctx.current_id, false);
         let body = state
@@ -212,18 +200,22 @@ impl Field for InstanceField {
             response = Some(new);
         }
 
-        ctx.offset += self.size();
+        // Only advance offset if a class is assigned
+        if actual_size > 0 {
+            ctx.offset += actual_size;
+        }
         response
     }
 
     fn codegen(&self, generator: &mut dyn Generator, data: &CodegenData) {
-        generator.add_field(
-            self.state.name.borrow().as_str(),
-            FieldKind::Instance,
-            data.classes
-                .iter()
-                .find(|c| c.id() == self.class_id.get().unwrap())
-                .map(|c| c.name.as_ref()),
-        );
+        if let Some(class_id) = self.class_id.get() {
+            if let Some(class) = data.classes.iter().find(|c| c.id() == class_id) {
+                generator.add_field(
+                    self.state.name.borrow().as_str(),
+                    FieldKind::Instance,
+                    Some(class.name.as_ref()),
+                );
+            }
+        }
     }
 }

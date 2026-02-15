@@ -47,8 +47,8 @@ impl FieldKind {
             Self::Unk32 | Self::I32 | Self::U32 | Self::F32 => 4,
             // TODO(ItsEthra): Pointer size is... sigh, different for 32-bit processes
             Self::Unk64 | Self::I64 | Self::U64 | Self::F64 | Self::Ptr | Self::StrPtr => 8,
-            // Instance fields default to 64 bytes but can be larger
-            Self::Instance => 64,
+            // Instance fields have variable size, this shouldn't be used directly
+            Self::Instance => 0,
         }
     }
 
