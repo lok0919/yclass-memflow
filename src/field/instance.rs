@@ -6,8 +6,8 @@ use crate::context::InspectionContext;
 use crate::generator::Generator;
 use eframe::{
     egui::{
-        collapsing_header::CollapsingState, popup_below_widget, Id, Label, RichText, Sense,
-        TextFormat, Ui,
+        collapsing_header::CollapsingState, popup_below_widget, Id, Label, RichText, ScrollArea,
+        Sense, TextFormat, Ui,
     },
     epaint::{text::LayoutJob, Color32},
 };
@@ -92,16 +92,18 @@ impl InstanceField {
         }
 
         popup_below_widget(ui, Id::new(ctx.current_id), &r, |ui| {
-            ui.set_width(80.);
-            ui.vertical_centered_justified(|ui| {
-                for cl in ctx.class_list.classes() {
-                    // Filter out the current class to prevent circular references
-                    if cl.id() != ctx.current_container {
-                        if ui.button(&cl.name).clicked() {
-                            self.class_id.set(Some(cl.id()));
+            ui.set_width(140.);
+            ScrollArea::vertical().max_height(300.).show(ui, |ui| {
+                ui.vertical_centered_justified(|ui| {
+                    for cl in ctx.class_list.classes() {
+                        // Filter out the current class to prevent circular references
+                        if cl.id() != ctx.current_container {
+                            if ui.button(&cl.name).clicked() {
+                                self.class_id.set(Some(cl.id()));
+                            }
                         }
                     }
-                }
+                });
             });
         });
     }

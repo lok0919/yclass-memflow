@@ -5,8 +5,8 @@ use super::{
 use crate::{address::parse_address, context::InspectionContext, generator::Generator, FID_M};
 use eframe::{
     egui::{
-        collapsing_header::CollapsingState, popup_below_widget, Id, Label, RichText, Sense,
-        TextFormat, Ui,
+        collapsing_header::CollapsingState, popup_below_widget, Id, Label, RichText, ScrollArea,
+        Sense, TextFormat, Ui,
     },
     epaint::{text::LayoutJob, Color32},
 };
@@ -116,12 +116,14 @@ impl PointerField {
 
         popup_below_widget(ui, Id::new(ctx.current_id), &r, |ui| {
             ui.set_width(80.);
-            ui.vertical_centered_justified(|ui| {
-                for cl in ctx.class_list.classes() {
-                    if ui.button(&cl.name).clicked() {
-                        self.class_id.set(Some(cl.id()));
+            ScrollArea::vertical().max_height(300.).show(ui, |ui| {
+                ui.vertical_centered_justified(|ui| {
+                    for cl in ctx.class_list.classes() {
+                        if ui.button(&cl.name).clicked() {
+                            self.class_id.set(Some(cl.id()));
+                        }
                     }
-                }
+                });
             });
         });
     }
