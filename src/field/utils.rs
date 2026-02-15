@@ -31,6 +31,7 @@ pub fn display_field_prelude(
         super::FieldKind::Ptr => "PTR",
         super::FieldKind::StrPtr => "STR",
         super::FieldKind::Bool => "BOOL",
+        super::FieldKind::Instance => "INST",
     };
     job.append(type_abbr, 0., {
         let color = match field.kind() {
@@ -47,7 +48,9 @@ pub fn display_field_prelude(
             | super::FieldKind::U32
             | super::FieldKind::U64 => Color32::LIGHT_GREEN,
             super::FieldKind::F32 | super::FieldKind::F64 => Color32::LIGHT_RED,
-            super::FieldKind::Ptr | super::FieldKind::StrPtr => Color32::BROWN,
+            super::FieldKind::Ptr | super::FieldKind::StrPtr | super::FieldKind::Instance => {
+                Color32::BROWN
+            }
             super::FieldKind::Bool => Color32::GOLD,
         };
         create_text_format(ctx.is_selected(field.id()), color)

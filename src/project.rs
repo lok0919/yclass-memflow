@@ -1,7 +1,7 @@
 /// This module contains structures that serialize/deserialize project data(i.e. classes).
 use crate::{
     class::{Class, ClassList},
-    field::{allocate_padding, CodegenData, Field, FieldKind, PointerField},
+    field::{allocate_padding, CodegenData, Field, FieldKind, InstanceField, PointerField},
     generator::Generator,
 };
 use serde::{Deserialize, Serialize};
@@ -135,6 +135,28 @@ impl ProjectData {
                             class
                                 .fields
                                 .push(Box::new(PointerField::new_with_class_id(name, new_cid))
+                                    as Box<dyn Field>);
+                        }
+                    }
+                    FieldKind::Instance => {
+                        let classname = metadata.as_deref();
+                        if let Some(refclass) = classname.and_then(|name| list.by_name(name)) {
+                            let refid = refclass.id();
+                            let class = list.by_id_mut(cid).unwrap();
+                            class
+                                .fields
+                                .push(Box::new(InstanceField::new_with_class_id(name, refid))
+                                    as Box<dyn Field>);
+                        } else {
+                            let new_cid = list.add_class(
+                                classname
+                                    .map(str::to_owned)
+                                    .unwrap_or_else(|| format!("C{:X}", field_offset)),
+                            );
+                            let class = list.by_id_mut(cid).unwrap();
+                            class
+                                .fields
+                                .push(Box::new(InstanceField::new_with_class_id(name, new_cid))
                                     as Box<dyn Field>);
                         }
                     }
