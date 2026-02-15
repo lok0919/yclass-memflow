@@ -18,6 +18,7 @@ pub struct InstanceField {
     id: FieldId,
     state: NamedState,
     class_id: Cell<Option<usize>>,
+    cached_size: Cell<usize>,
 }
 
 impl InstanceField {
@@ -26,6 +27,7 @@ impl InstanceField {
             id: next_id(),
             state: NamedState::new(name),
             class_id: None.into(),
+            cached_size: Cell::new(0),
         }
     }
 
@@ -34,11 +36,17 @@ impl InstanceField {
             id: next_id(),
             state: NamedState::new(name),
             class_id: Some(class_id).into(),
+            cached_size: Cell::new(0),
         }
     }
 
     fn show_header(&self, ui: &mut Ui, ctx: &mut InspectionContext) {
         let class = self.class_id.get().and_then(|id| ctx.class_list.by_id(id));
+
+        // Cache the size when we have a class assigned
+        if let Some(cl) = &class {
+            self.cached_size.set(cl.size_with_instances(ctx.class_list));
+        }
 
         let (text, exists) = if let Some(cl) = class {
             (format!("[{}]", cl.name), true)
@@ -157,17 +165,8 @@ impl Field for InstanceField {
     }
 
     fn size(&self) -> usize {
-        // Calculate size from embedded class
-        self.class_id
-            .get()
-            .and_then(|_| {
-                // We can't access context here, so return a placeholder
-                // The actual size is calculated when rendering
-                None
-            })
-            .unwrap_or(0)
-        // If we can't determine size (no class assigned), return 0
-        // This will be overridden during draw() where we have context
+        // Return cached size (set during show_header when we have context)
+        self.cached_size.get()
     }
 
     fn name(&self) -> Option<String> {
@@ -179,14 +178,6 @@ impl Field for InstanceField {
     }
 
     fn draw(&self, ui: &mut Ui, ctx: &mut InspectionContext) -> Option<FieldResponse> {
-        // Calculate actual size from the embedded class
-        let actual_size = self
-            .class_id
-            .get()
-            .and_then(|id| ctx.class_list.by_id(id))
-            .map(|cl| cl.size())
-            .unwrap_or(0);
-
         let mut response = None;
 
         let state = CollapsingState::load_with_default_open(ui.ctx(), ctx.current_id, false);
@@ -200,9 +191,11 @@ impl Field for InstanceField {
             response = Some(new);
         }
 
-        // Only advance offset if a class is assigned
-        if actual_size > 0 {
-            ctx.offset += actual_size;
+        // Advance offset by the cached size (set in show_header)
+        // Only advance if size > 0 (class is assigned)
+        let size = self.size();
+        if size > 0 {
+            ctx.offset += size;
         }
         response
     }
