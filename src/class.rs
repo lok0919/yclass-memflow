@@ -34,6 +34,10 @@ impl Class {
     pub fn id(&self) -> usize {
         self.id
     }
+
+    pub fn size(&self) -> usize {
+        self.fields.iter().map(|f| f.size()).sum()
+    }
 }
 
 pub struct ClassList {

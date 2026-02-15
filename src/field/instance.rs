@@ -15,6 +15,7 @@ pub struct InstanceField {
     id: FieldId,
     state: NamedState,
     class_id: Cell<Option<usize>>,
+    cached_size: Cell<usize>,
 }
 
 impl InstanceField {
@@ -23,6 +24,7 @@ impl InstanceField {
             id: next_id(),
             state: NamedState::new(name),
             class_id: None.into(),
+            cached_size: Cell::new(64),
         }
     }
 
@@ -31,10 +33,25 @@ impl InstanceField {
             id: next_id(),
             state: NamedState::new(name),
             class_id: Some(class_id).into(),
+            cached_size: Cell::new(64),
         }
     }
 
+    /// Update the cached size based on the current class
+    fn update_size(&self, ctx: &InspectionContext) {
+        let size = self
+            .class_id
+            .get()
+            .and_then(|id| ctx.class_list.by_id(id))
+            .map(|cl| cl.size())
+            .unwrap_or(64);
+        self.cached_size.set(size);
+    }
+
     fn show_header(&self, ui: &mut Ui, ctx: &mut InspectionContext) {
+        // Update cached size based on current class
+        self.update_size(ctx);
+
         let class = self.class_id.get().and_then(|id| ctx.class_list.by_id(id));
 
         let (text, exists) = if let Some(cl) = class {
@@ -166,7 +183,7 @@ impl Field for InstanceField {
     }
 
     fn size(&self) -> usize {
-        64
+        self.cached_size.get()
     }
 
     fn name(&self) -> Option<String> {
