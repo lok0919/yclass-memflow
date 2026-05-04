@@ -41,7 +41,7 @@ impl Class {
 
     /// Calculate class size including nested instances.
     /// For instance fields, recursively gets the size of the embedded class.
-    pub fn size_with_instances(&self, class_list: &ClassList) -> usize {
+    pub fn size_with_instances(&self, _class_list: &ClassList) -> usize {
         self.fields
             .iter()
             .map(|f| {

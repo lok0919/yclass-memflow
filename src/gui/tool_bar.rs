@@ -209,7 +209,7 @@ impl ToolBarPanel {
             }
         };
 
-        if(do_attach) {
+        if do_attach {
             let state = &mut *self.state.borrow_mut();
             if let Some(name) = state.config.last_attached_process_name.as_ref().cloned() {
                 attach_to_process(state, &name, response);

@@ -27,7 +27,7 @@ impl YClassApp {
 }
 
 impl App for YClassApp {
-    fn update(&mut self, ctx: &Context, frame: &mut Frame) {
+    fn update(&mut self, ctx: &Context, _frame: &mut Frame) {
         ctx.request_repaint_after(Duration::from_millis(100));
 
         static DPI_INIT: Once = Once::new();

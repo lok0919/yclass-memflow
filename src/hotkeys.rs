@@ -22,7 +22,7 @@ impl HotkeyManager {
             return false;
         };
 
-        input.key_pressed(shortcut.logical_key) && input.modifiers.matches(shortcut.modifiers)
+        input.key_pressed(shortcut.logical_key) && input.modifiers.matches_exact(shortcut.modifiers)
     }
 
     pub fn format(&self, name: &'static str, ctx: &Context) -> String {

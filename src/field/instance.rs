@@ -91,7 +91,7 @@ impl InstanceField {
             ctx.select(self.id);
         }
 
-        popup_below_widget(ui, Id::new(ctx.current_id), &r, |ui| {
+        popup_below_widget(ui, Id::new(ctx.current_id), &r, eframe::egui::PopupCloseBehavior::CloseOnClick,|ui| {
             ui.set_width(140.);
             ScrollArea::vertical().max_height(300.).show(ui, |ui| {
                 ui.vertical_centered_justified(|ui| {
@@ -140,7 +140,7 @@ impl InstanceField {
                 parent_id: ctx.current_id,
                 selection: ctx.selection,
                 current_container: cid,
-                current_id: Id::null(),
+                current_id: Id::NULL,
                 process: ctx.process,
                 toasts: ctx.toasts,
                 level_rng: &rng,
