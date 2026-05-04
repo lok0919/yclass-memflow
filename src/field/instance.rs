@@ -1,8 +1,9 @@
 use super::{
-    create_text_format, display_field_name, display_field_prelude, display_field_value, next_id,
-    CodegenData, Field, FieldId, FieldKind, FieldResponse, NamedState,
+    create_text_format, display_field_name, display_field_prelude, next_id, CodegenData, Field,
+    FieldId, FieldKind, FieldResponse, NamedState,
 };
-use crate::{address::parse_address, context::InspectionContext, generator::Generator, FID_M};
+use crate::context::InspectionContext;
+use crate::generator::Generator;
 use eframe::{
     egui::{
         collapsing_header::CollapsingState, popup_below_widget, Id, Label, RichText, ScrollArea,
@@ -13,18 +14,20 @@ use eframe::{
 use fastrand::Rng;
 use std::{cell::Cell, mem::transmute};
 
-pub struct PointerField {
+pub struct InstanceField {
     id: FieldId,
     state: NamedState,
     class_id: Cell<Option<usize>>,
+    cached_size: Cell<usize>,
 }
 
-impl PointerField {
+impl InstanceField {
     pub fn new(name: String) -> Self {
         Self {
             id: next_id(),
             state: NamedState::new(name),
             class_id: None.into(),
+            cached_size: Cell::new(0),
         }
     }
 
@@ -33,66 +36,40 @@ impl PointerField {
             id: next_id(),
             state: NamedState::new(name),
             class_id: Some(class_id).into(),
+            cached_size: Cell::new(0),
         }
     }
 
-    fn show_header(&self, ui: &mut Ui, ctx: &mut InspectionContext, address: usize) {
+    fn show_header(&self, ui: &mut Ui, ctx: &mut InspectionContext) {
         let class = self.class_id.get().and_then(|id| ctx.class_list.by_id(id));
+
+        // Cache the size when we have a class assigned
+        if let Some(cl) = &class {
+            self.cached_size.set(cl.size_with_instances(ctx.class_list));
+        }
 
         let (text, exists) = if let Some(cl) = class {
             (format!("[{}]", cl.name), true)
         } else {
-            (format!("[C{:X}]", address), false)
+            (format!("[unassigned]"), false)
         };
 
         let mut job = LayoutJob::default();
-        let is_misaligned = display_field_prelude(ui.ctx(), self, ctx, &mut job);
+        let _is_misaligned = display_field_prelude(ui.ctx(), self, ctx, &mut job);
         job.append(" ", 0., TextFormat::default());
 
         let r = ui.add(Label::new(job).sense(Sense::click()));
-        let clicked = r.clicked();
-        if is_misaligned {
-            r.on_hover_text(format!(
-                "Misaligned: {}-byte field at offset {:04X} (not {}-byte aligned)",
-                self.size(),
-                ctx.offset,
-                self.size()
-            ));
-        }
-        if clicked {
+        if r.clicked() {
             ctx.select(self.id);
         }
 
         display_field_name(self, ui, ctx, &self.state, Color32::BROWN);
 
         let is_selected = ctx.is_selected(self.id);
-        let paddr = ctx.address + ctx.offset;
 
         ui.add_space(4.);
 
-        display_field_value(
-            self,
-            ui,
-            ctx,
-            &self.state,
-            Color32::YELLOW,
-            |v| {
-                if v {
-                    format!("{address:X}")
-                } else {
-                    format!("-> {address:X}")
-                }
-            },
-            |new| {
-                if let Some(addr) = parse_address(new) {
-                    ctx.process.write(paddr, &addr.to_ne_bytes());
-                    true
-                } else {
-                    false
-                }
-            },
-        );
-
+        // Display class reference with right-click popup
         let mut job = LayoutJob::default();
         job.append(
             &text,
@@ -102,7 +79,7 @@ impl PointerField {
                 if exists {
                     Color32::LIGHT_GRAY
                 } else {
-                    Color32::DARK_GRAY
+                    Color32::DARK_RED
                 },
             ),
         );
@@ -114,13 +91,16 @@ impl PointerField {
             ctx.select(self.id);
         }
 
-        popup_below_widget(ui, Id::new(ctx.current_id), &r, eframe::egui::PopupCloseBehavior::CloseOnClick,|ui| {
-            ui.set_width(80.);
+        popup_below_widget(ui, Id::new(ctx.current_id), &r, |ui| {
+            ui.set_width(140.);
             ScrollArea::vertical().max_height(300.).show(ui, |ui| {
                 ui.vertical_centered_justified(|ui| {
                     for cl in ctx.class_list.classes() {
-                        if ui.button(&cl.name).clicked() {
-                            self.class_id.set(Some(cl.id()));
+                        // Filter out the current class to prevent circular references
+                        if cl.id() != ctx.current_container {
+                            if ui.button(&cl.name).clicked() {
+                                self.class_id.set(Some(cl.id()));
+                            }
                         }
                     }
                 });
@@ -128,17 +108,23 @@ impl PointerField {
         });
     }
 
-    fn show_body(
-        &self,
-        ui: &mut Ui,
-        ctx: &mut InspectionContext,
-        address: usize,
-    ) -> Option<FieldResponse> {
-        if !ctx.process.can_read(address) {
+    fn show_body(&self, ui: &mut Ui, ctx: &mut InspectionContext) -> Option<FieldResponse> {
+        // If no class is assigned, show a message
+        if self.class_id.get().is_none() {
+            ui.label(
+                RichText::new("Right-click the class reference above to assign a class")
+                    .color(Color32::LIGHT_GRAY),
+            );
+            return None;
+        }
+
+        if !ctx.process.can_read(ctx.address + ctx.offset) {
             ui.heading(
-                RichText::new(format!("Can't read memory at address {address:#X}"))
-                    .color(Color32::RED)
-                    .font(FID_M),
+                RichText::new(format!(
+                    "Can't read memory at address {:#X}",
+                    ctx.address + ctx.offset
+                ))
+                .color(Color32::RED),
             );
             return None;
         }
@@ -154,13 +140,12 @@ impl PointerField {
                 parent_id: ctx.current_id,
                 selection: ctx.selection,
                 current_container: cid,
-                // Will be immideately reassigned.
-                current_id: Id::NULL,
+                current_id: Id::null(),
                 process: ctx.process,
                 toasts: ctx.toasts,
                 level_rng: &rng,
                 offset: 0,
-                address,
+                address: ctx.address + ctx.offset,
             };
 
             #[allow(clippy::single_match)]
@@ -173,24 +158,20 @@ impl PointerField {
             }
 
             ctx.selection = inner_ctx.selection;
-        } else {
-            response = Some(FieldResponse::NewClass(format!("C{:X}", address), cid));
         }
 
         response
     }
 }
 
-impl Field for PointerField {
+impl Field for InstanceField {
     fn id(&self) -> FieldId {
         self.id
     }
 
     fn size(&self) -> usize {
-        // TODO(ItsEthra): When inspecting 32-bit processes
-        // size of the pointer would be `4`. But I am not sure
-        // if the rest of this app isn't break in this case lol.
-        8
+        // Return cached size (set during show_header when we have context)
+        self.cached_size.get()
     }
 
     fn name(&self) -> Option<String> {
@@ -198,25 +179,16 @@ impl Field for PointerField {
     }
 
     fn kind(&self) -> FieldKind {
-        FieldKind::Ptr
+        FieldKind::Instance
     }
 
     fn draw(&self, ui: &mut Ui, ctx: &mut InspectionContext) -> Option<FieldResponse> {
         let mut response = None;
 
-        // TODO(ItsEthra): Again, pointer size differs in 32-bit processes.
-        let mut buf = [0; 8];
-        ctx.process.read(ctx.address + ctx.offset, &mut buf);
-        let address = usize::from_ne_bytes(buf);
-
-        if self.class_id.get().is_none() {
-            self.class_id.set(Some(fastrand::usize(..)));
-        }
-
         let state = CollapsingState::load_with_default_open(ui.ctx(), ctx.current_id, false);
         let body = state
-            .show_header(ui, |ui| self.show_header(ui, ctx, address))
-            .body(|ui| self.show_body(ui, ctx, address))
+            .show_header(ui, |ui| self.show_header(ui, ctx))
+            .body(|ui| self.show_body(ui, ctx))
             .2;
         let body = body.and_then(|inner| inner.inner);
 
@@ -224,18 +196,24 @@ impl Field for PointerField {
             response = Some(new);
         }
 
-        ctx.offset += self.size();
+        // Advance offset by the cached size (set in show_header)
+        // Only advance if size > 0 (class is assigned)
+        let size = self.size();
+        if size > 0 {
+            ctx.offset += size;
+        }
         response
     }
 
     fn codegen(&self, generator: &mut dyn Generator, data: &CodegenData) {
-        generator.add_field(
-            self.state.name.borrow().as_str(),
-            FieldKind::Ptr,
-            data.classes
-                .iter()
-                .find(|c| c.id() == self.class_id.get().unwrap())
-                .map(|c| c.name.as_ref()),
-        );
+        if let Some(class_id) = self.class_id.get() {
+            if let Some(class) = data.classes.iter().find(|c| c.id() == class_id) {
+                generator.add_field(
+                    self.state.name.borrow().as_str(),
+                    FieldKind::Instance,
+                    Some(class.name.as_ref()),
+                );
+            }
+        }
     }
 }

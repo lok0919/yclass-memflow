@@ -1,7 +1,7 @@
 use super::{create_text_format, EditingState, Field, HexField, NamedState};
 use crate::{app::is_valid_ident, context::InspectionContext, FID_M};
 use eframe::{
-    egui::{Context, FontSelection, Key, Label, Modifiers, Sense, TextEdit, Ui},
+    egui::{Context, FontSelection, Key, Label, Modifiers, Sense, TextEdit, TextFormat, Ui},
     epaint::{text::LayoutJob, Color32, Stroke},
 };
 use std::fmt::Display;
@@ -11,11 +11,59 @@ pub fn display_field_prelude(
     field: &dyn Field,
     ctx: &mut InspectionContext,
     job: &mut LayoutJob,
-) {
+) -> bool {
+    // Display field type abbreviation
+    let type_abbr = match field.kind() {
+        super::FieldKind::Unk8 => "U8",
+        super::FieldKind::Unk16 => "U16",
+        super::FieldKind::Unk32 => "U32",
+        super::FieldKind::Unk64 => "U64",
+        super::FieldKind::I8 => "I8",
+        super::FieldKind::I16 => "I16",
+        super::FieldKind::I32 => "I32",
+        super::FieldKind::I64 => "I64",
+        super::FieldKind::U8 => "U8",
+        super::FieldKind::U16 => "U16",
+        super::FieldKind::U32 => "U32",
+        super::FieldKind::U64 => "U64",
+        super::FieldKind::F32 => "F32",
+        super::FieldKind::F64 => "F64",
+        super::FieldKind::Ptr => "PTR",
+        super::FieldKind::StrPtr => "STR",
+        super::FieldKind::Bool => "BOOL",
+        super::FieldKind::Instance => "INST",
+    };
+    job.append(type_abbr, 0., {
+        let color = match field.kind() {
+            super::FieldKind::Unk8
+            | super::FieldKind::Unk16
+            | super::FieldKind::Unk32
+            | super::FieldKind::Unk64 => Color32::GRAY,
+            super::FieldKind::I8
+            | super::FieldKind::I16
+            | super::FieldKind::I32
+            | super::FieldKind::I64 => Color32::LIGHT_BLUE,
+            super::FieldKind::U8
+            | super::FieldKind::U16
+            | super::FieldKind::U32
+            | super::FieldKind::U64 => Color32::LIGHT_GREEN,
+            super::FieldKind::F32 | super::FieldKind::F64 => Color32::LIGHT_RED,
+            super::FieldKind::Ptr | super::FieldKind::StrPtr | super::FieldKind::Instance => {
+                Color32::BROWN
+            }
+            super::FieldKind::Bool => Color32::GOLD,
+        };
+        create_text_format(ctx.is_selected(field.id()), color)
+    });
+    job.append(" ", 4., TextFormat::default());
+
+    // Check if field is misaligned
+    let is_misaligned = field.size() > 0 && ctx.offset % field.size() != 0;
+
     job.append(&format!("{:04X}", ctx.offset), 0., {
         let mut tf = create_text_format(ctx.is_selected(field.id()), Color32::KHAKI);
-        // Highlight unaligned fields
-        if ctx.offset % 8 != 0 {
+        // Highlight fields not aligned to their natural size
+        if is_misaligned {
             tf.underline = Stroke::new(1., Color32::RED);
         }
 
@@ -42,6 +90,8 @@ pub fn display_field_prelude(
         8.,
         create_text_format(ctx.is_selected(field.id()), Color32::LIGHT_GREEN),
     );
+
+    is_misaligned
 }
 
 pub fn display_field_value<T: Display>(

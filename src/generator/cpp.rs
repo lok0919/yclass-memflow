@@ -76,5 +76,6 @@ fn kind_to_type(kind: FieldKind, metadata: Option<&str>) -> Cow<'static, str> {
         FieldKind::Ptr => format!("{}*", metadata.unwrap_or("void")).into(),
         FieldKind::StrPtr => "const char*".into(),
         FieldKind::Bool => "bool".into(),
+        FieldKind::Instance => format!("{}", metadata.unwrap_or("void")).into(),
     }
 }

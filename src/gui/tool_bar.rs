@@ -5,7 +5,9 @@ use crate::{
     state::{GlobalState, StateRef},
 };
 use eframe::{
-    egui::{Button, Context, CornerRadius, Frame, Margin, RichText, TopBottomPanel, Ui, WidgetText},
+    egui::{
+        Button, Context, CornerRadius, Frame, Margin, RichText, ScrollArea, TopBottomPanel, Ui, WidgetText,
+    },
     epaint::{vec2, Color32},
 };
 use memflow::prelude::v1::*;
@@ -97,77 +99,82 @@ impl ToolBarPanel {
         TopBottomPanel::top("_top_bar")
             .frame(frame)
             .show(ctx, |ui| {
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = 0.;
-                    ui.visuals_mut().widgets.inactive.corner_radius = CornerRadius::ZERO;
+                ScrollArea::horizontal().show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.spacing_mut().item_spacing.x = 0.;
+                        ui.visuals_mut().widgets.inactive.corner_radius = CornerRadius::ZERO;
 
-                    ui.menu_button("Project", |ui| self.project_menu(ui));
-                    ui.menu_button("Process", |ui| self.process_menu(ui, &mut response));
+                        ui.menu_button("Project", |ui| self.project_menu(ui));
+                        ui.menu_button("Process", |ui| self.process_menu(ui, &mut response));
 
-                    if ui.button("Generator").clicked() {
-                        self.generator_window.toggle();
-                    }
+                        if ui.button("Generator").clicked() {
+                            self.generator_window.toggle();
+                        }
 
-                    if ui.button("Spider").clicked() {
-                        self.spider_window.toggle();
-                    }
+                        if ui.button("Spider").clicked() {
+                            self.spider_window.toggle();
+                        }
 
-                    ui.add_space(4.);
-                    ui.separator();
-                    ui.add_space(4.);
+                        ui.add_space(4.);
+                        ui.separator();
+                        ui.add_space(4.);
 
-                    self.status_ui(ui, &mut response);
+                        self.status_ui(ui, &mut response);
 
-                    ui.add_space(4.);
-                    ui.separator();
-                    ui.add_space(4.);
+                        ui.add_space(4.);
+                        ui.separator();
+                        ui.add_space(4.);
 
-                    macro_rules! create_add_remove_group {
-                        ($ui:ident, $r:ident, $var:ident, $($item:expr),*) => {
-                            $(
-                                if $ui.button(stringify!($item)).clicked() {
-                                    $r = Some(ToolBarResponse::$var($item));
-                                    $ui.close_menu();
-                                }
-                            )*
-                        };
-                    }
+                        macro_rules! create_add_remove_group {
+                                ($ui:ident, $r:ident, $var:ident, $($item:expr),*) => {
+                                    $(
+                                        if $ui.button(stringify!($item)).clicked() {
+                                            $r = Some(ToolBarResponse::$var($item));
+                                            $ui.close_menu();
+                                        }
+                                    )*
+                                };
+                            }
 
-                    ui.menu_button("Add", |ui| {
-                        ui.set_width(64.);
+                        ui.menu_button("Add", |ui| {
+                            ui.set_width(64.);
 
-                        ui.vertical_centered_justified(|ui| {
+                            ui.vertical_centered_justified(|ui| {
+                                create_add_remove_group!(
+                                    ui, response, Add, 8, 16, 32, 64, 128, 256, 512, 1024, 2048,
+                                    4096
+                                );
+                            });
+                        })
+                        .response
+                        .on_hover_text("Adds N bytes");
+
+                        ui.menu_button("Remove", |ui| {
+                            ui.set_width(64.);
+
                             create_add_remove_group!(
-                                ui, response, Add, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096
+                                ui, response, Remove, 1, 2, 4, 16, 64, 256, 1024
                             );
-                        });
-                    })
-                    .response
-                    .on_hover_text("Adds N bytes");
+                        })
+                        .response
+                        .on_hover_text("Removes N fields");
 
-                    ui.menu_button("Remove", |ui| {
-                        ui.set_width(64.);
+                        ui.menu_button("Insert", |ui| {
+                            ui.set_width(64.);
 
-                        create_add_remove_group!(ui, response, Remove, 1, 2, 4, 16, 64, 256, 1024);
-                    })
-                    .response
-                    .on_hover_text("Removes N fields");
+                            create_add_remove_group!(
+                                ui, response, Insert, 1, 2, 4, 8, 16, 64, 256, 1024
+                            );
+                        })
+                        .response
+                        .on_hover_text("Inserts N bytes");
 
-                    ui.menu_button("Insert", |ui| {
-                        ui.set_width(64.);
+                        ui.add_space(2.);
+                        ui.separator();
+                        ui.add_space(2.);
 
-                        create_add_remove_group!(
-                            ui, response, Insert, 1, 2, 4, 8, 16, 64, 256, 1024
-                        );
-                    })
-                    .response
-                    .on_hover_text("Inserts N bytes");
-
-                    ui.add_space(2.);
-                    ui.separator();
-                    ui.add_space(2.);
-
-                    self.field_change_ui(ui, &mut response);
+                        self.field_change_ui(ui, &mut response);
+                    });
                 });
             });
 
@@ -362,7 +369,7 @@ impl ToolBarPanel {
         ui.separator();
         ui.add_space(2.);
 
-        create_change_field_type_group!(ui, response, BLACK, BROWN, Ptr, StrPtr);
+        create_change_field_type_group!(ui, response, BLACK, BROWN, Ptr, StrPtr, Instance);
     }
 }
 
