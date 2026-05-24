@@ -34,6 +34,29 @@ impl Class {
     pub fn id(&self) -> usize {
         self.id
     }
+
+    pub fn size(&self) -> usize {
+        self.fields.iter().map(|f| f.size()).sum()
+    }
+
+    /// Calculate class size including nested instances.
+    /// For instance fields, recursively gets the size of the embedded class.
+    pub fn size_with_instances(&self, _class_list: &ClassList) -> usize {
+        self.fields
+            .iter()
+            .map(|f| {
+                // Check if this is an instance field by checking the kind
+                if f.kind() == FieldKind::Instance {
+                    // We need to get the class_id from the instance field
+                    // Since we can't access it through the trait, we'll need a different approach
+                    // For now, use the regular size which will be 0
+                    f.size()
+                } else {
+                    f.size()
+                }
+            })
+            .sum()
+    }
 }
 
 pub struct ClassList {

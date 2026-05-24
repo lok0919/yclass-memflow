@@ -57,8 +57,18 @@ impl Field for StringPointerField {
 
         ui.horizontal(|ui| {
             let mut job = LayoutJob::default();
-            display_field_prelude(ui.ctx(), self, ctx, &mut job);
-            if ui.add(Label::new(job).sense(Sense::click())).clicked() {
+            let is_misaligned = display_field_prelude(ui.ctx(), self, ctx, &mut job);
+            let r = ui.add(Label::new(job).sense(Sense::click()));
+            let clicked = r.clicked();
+            if is_misaligned {
+                r.on_hover_text(format!(
+                    "Misaligned: {}-byte field at offset {:04X} (not {}-byte aligned)",
+                    self.size(),
+                    ctx.offset,
+                    self.size()
+                ));
+            }
+            if clicked {
                 ctx.select(self.id);
             }
             display_field_name(self, ui, ctx, &self.state, Color32::LIGHT_RED);

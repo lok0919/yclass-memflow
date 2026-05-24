@@ -14,6 +14,8 @@ mod string_pointer;
 pub use string_pointer::*;
 mod boolean;
 pub use boolean::*;
+mod instance;
+pub use instance::*;
 
 use crate::{class::Class, context::InspectionContext, generator::Generator, FID_M};
 use eframe::{
