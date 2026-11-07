@@ -98,7 +98,7 @@ impl SpiderWindow {
                         .borrow()
                         .class_list
                         .selected_class()
-                        .map(|c| c.address.get())
+                        .map(|c| c.address.borrow().value())
                         .unwrap_or(0)
                 });
             self.base_address.set(address, format!("{address:X}"));

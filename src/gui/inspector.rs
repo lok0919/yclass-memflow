@@ -1,6 +1,5 @@
 use crate::{
-    address::parse_address, context::InspectionContext, field::FieldResponse, state::StateRef,
-    FID_M,
+    context::InspectionContext, field::FieldResponse, state::StateRef, FID_M,
 };
 use eframe::{
     egui::{collapsing_header::CollapsingState, CentralPanel, Context, Id, ScrollArea, Ui},
@@ -61,16 +60,24 @@ impl InspectorPanel {
 
                         let r = ui.text_edit_singleline(&mut self.address_buffer);
                         if r.lost_focus() {
-                            if let Some(addr) = parse_address(&self.address_buffer) {
-                                selected_class.address.set(addr);
-                            } else {
+                            if !selected_class
+                                .address
+                                .borrow_mut()
+                                .set_expression(&self.address_buffer)
+                            {
                                 state.toasts.error("Address is in invalid format");
                             }
                         }
 
                         if !r.has_focus() {
-                            self.address_buffer = format!("0x{:X}", selected_class.address.get());
+                            self.address_buffer =
+                                selected_class.address.borrow().expression().to_string();
                         }
+
+                        r.on_hover_text(format!(
+                            "Evaluated: 0x{:X}",
+                            selected_class.address.borrow().value()
+                        ));
 
                         Some(())
                     })
@@ -87,7 +94,7 @@ impl InspectorPanel {
 
         let process_lock = state.process.read();
         let mut ctx = InspectionContext {
-            address: state.class_list.selected_class()?.address.get(),
+            address: state.class_list.selected_class()?.address.borrow().value(),
             current_container: state.class_list.selected()?,
             process: process_lock.as_ref()?,
             class_list: &state.class_list,

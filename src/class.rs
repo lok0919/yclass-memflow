@@ -1,12 +1,13 @@
+use crate::address::Address;
 use crate::field::{Field, FieldKind, HexField};
-use std::{cell::Cell, iter::repeat_with};
+use std::{cell::RefCell, iter::repeat_with};
 
 pub type ClassId = usize;
 
 pub struct Class {
     id: ClassId,
     pub name: String,
-    pub address: Cell<usize>,
+    pub address: RefCell<Address>,
     pub fields: Vec<Box<dyn Field>>,
 }
 
@@ -18,7 +19,7 @@ impl Class {
             fields: repeat_with(|| Box::new(HexField::<8>::new()) as Box<dyn Field>)
                 .take(10)
                 .collect(),
-            address: 0.into(),
+            address: RefCell::new(Address::from_value(0)),
         }
     }
 
@@ -27,7 +28,7 @@ impl Class {
             id,
             name,
             fields: vec![],
-            address: 0.into(),
+            address: RefCell::new(Address::from_value(0)),
         }
     }
 
